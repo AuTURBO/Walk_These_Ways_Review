@@ -17,7 +17,6 @@ class BaseTask(gym.Env):
         self.gym = gymapi.acquire_gym()
         self.x_vel_cmd = 0.0
         
-        
         if isinstance(physics_engine, str) and physics_engine == "SIM_PHYSX":
             physics_engine = gymapi.SIM_PHYSX
 
@@ -25,7 +24,7 @@ class BaseTask(gym.Env):
         self.physics_engine = physics_engine
         self.sim_device = sim_device
         sim_device_type, self.sim_device_id = gymutil.parse_device_str(self.sim_device)
-        self.headless = True # set
+        self.headless = headless
 
         # env device is GPU only if sim is on GPU and use_gpu_pipeline=True, otherwise returned tensors are copied to CPU by physX.
         if sim_device_type == 'cuda' and sim_params.use_gpu_pipeline:
