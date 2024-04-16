@@ -8,20 +8,19 @@ import os
 from isaacgym import gymapi
 import glob
 import pickle as pkl
-
+from go1_gym import MINI_GYM_ROOT_DIR
 from go1_gym.envs import *
 from go1_gym.envs.base.legged_robot_config import Cfg
 from go1_gym.envs.go1.go1_config import config_go1
 from go1_gym.envs.go1.velocity_tracking import VelocityTrackingEasyEnv
 from go1_gym.envs.base.base_task import BaseTask
-
+import os
 from tqdm import tqdm
 
-def load_policy(logdir):
-    body = torch.jit.load(logdir + '/checkpoints/body_latest.jit')
-    import os
-    adaptation_module = torch.jit.load(logdir + '/checkpoints/adaptation_module_latest.jit')
+def load_policy(full_path):
 
+    body = torch.jit.load(full_path + '/checkpoints/body_latest.jit')
+    adaptation_module = torch.jit.load(full_path + '/checkpoints/adaptation_module_latest.jit')
 
     def policy(obs, info={}):
         i = 0
@@ -33,15 +32,14 @@ def load_policy(logdir):
     return policy
 
 def load_env(label, headless=False):
-    base_path = "/home/kjh/isaacgym/isaacgym/python/go1/runs"
-    full_path = os.path.join(base_path, label)
 
     # The script now expects label to be the directory name where parameters.pkl is located
     # If label is not the directory name, you'll need to adjust how you're setting label
-    logdir = full_path
+    base_path = os.path.join(MINI_GYM_ROOT_DIR, "runs")
+    full_path = os.path.join(base_path, label)
 
     # Print out the path to ensure it's correct
-    parameters_file_path = os.path.join(logdir, "parameters.pkl")
+    parameters_file_path = os.path.join(full_path, "parameters.pkl")
     print(f"Looking for parameters.pkl at: {parameters_file_path}")
 
     # Check if the parameters file exists at the specified path
@@ -91,36 +89,31 @@ def load_env(label, headless=False):
 
     from go1_gym.envs.wrappers.history_wrapper import HistoryWrapper
 
-    env = VelocityTrackingEasyEnv(sim_device='cuda:0', headless=False, cfg=Cfg)
+    env = VelocityTrackingEasyEnv(sim_device='cuda:0', headless=headless, cfg=Cfg)
     env = HistoryWrapper(env)
     
     # load policy
-    from ml_logger import logger
-    from go1_gym_learn.ppo_cse.actor_critic import ActorCritic
-
-    policy = load_policy(logdir)
+    policy = load_policy(full_path)
 
     return env, policy
 
-def play_go1(headless=True):
-    from ml_logger import logger
-
-    from pathlib import Path
-    from go1_gym import MINI_GYM_ROOT_DIR
-    import glob
-    import os
+def play_go1(label, headless=True):
+    # from ml_logger import logger
+    # from pathlib import Path
+    # from go1_gym import MINI_GYM_ROOT_DIR
+    # import glob
+    # import os
     #import keyboard
     #gym = BaseTask
-    label = "gait-conditioned-agility/go1/train/060402.515358"
+    # label = "gait-conditioned-agility/pretrain-v0/train/025417.456545"
 
     env, policy = load_env(label, headless=headless)
+
     if hasattr(env, 'viewer') and env.viewer is not None:
         env.gym.subscribe_viewer_keyboard_event(env.viewer, gymapi.KEY_W, "forward")
         env.gym.subscribe_viewer_keyboard_event(env.viewer, gymapi.KEY_S, "backward")
         env.gym.subscribe_viewer_keyboard_event(env.viewer, gymapi.KEY_A, "turn_left")
         env.gym.subscribe_viewer_keyboard_event(env.viewer, gymapi.KEY_D, "turn_right")
-        
-
     
     num_eval_steps = 20000
     gaits = {"pronking": [0.0, 0, 0],
@@ -150,15 +143,11 @@ def play_go1(headless=True):
     #state = env.acquire_actor_root_state_tensor(env)
     #print(state)
 
-
     for i in tqdm(range(num_eval_steps)):
-        
-        
         
         env.handle_keyboard_events()
         x_vel_cmd = env.commands[:, 0].item()
         yaw_vel_cmd = env.commands[:, 2].item()
-        
         
         with torch.no_grad():
             actions = policy(obs)
@@ -211,4 +200,5 @@ def play_go1(headless=True):
 
 if __name__ == '__main__':
     # to see the environment rendering, set headless=False
-    play_go1(headless=False)
+    label = "gait-conditioned-agility/pretrain-v0/train/025417.456545"
+    play_go1(label=label, headless=False)
